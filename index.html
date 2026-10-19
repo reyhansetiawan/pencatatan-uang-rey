@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Laporan Keuangan KIP - REY</title>
+<title>Laporan Keuangan Dana KIP - REY</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
   body { background: #f0f4f8; min-height: 100vh; padding: 12px; }
-  .container { max-width: 600px; margin: 0 auto; }
+  .container { max-width: 650px; margin: 0 auto; }
   h1 { text-align: center; font-size: 20px; margin-bottom: 10px; color: #1a3c5e; }
   
   .saldo-box { background: linear-gradient(135deg, #1a6fc4, #155a9e); color: #fff;
@@ -18,8 +18,8 @@
 
   .form { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-  .form label { font-size: 12px; color: #555; display: block; margin-bottom: 3px; margin-top: 6px; }
-  .form input, .form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px;
+  .form label { font-size: 12px; color: #555; display: block; margin-bottom: 3px; margin-top: 8px; }
+  .form input, .form select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px;
     font-size: 14px; }
   .form input:focus, .form select:focus { outline: none; border-color: #1a6fc4; }
 
@@ -36,7 +36,7 @@
   .table-container { background: #fff; border-radius: 12px; padding: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,.08); overflow-x: auto; }
   
-  table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
   th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
   th { background: #f4b183; color: #000; font-weight: bold; text-align: center; }
   .text-right { text-align: right; }
@@ -52,8 +52,8 @@
   <h1>📊 Laporan Keuangan Dana KIP - REY</h1>
 
   <div class="saldo-box">
-    <small>SALDO AKHIR SAAT INI</small>
-    <div class="jumlah" id="saldo-akhir">Rp 0</div>
+    <small>SISA SALDO SAAT INI</small>
+    <div class="jumlah" id="saldo-akhir">Rp 6.600.000</div>
   </div>
 
   <div class="pesan" id="pesan">✓ Transaksi berhasil dicatat!</div>
@@ -63,22 +63,22 @@
     <input type="date" id="tgl">
     
     <label>Uraian / Transaksi</label>
-    <input type="text" id="uraian" placeholder="Contoh: Beli laptop / Saldo KIP">
+    <input type="text" id="uraian" placeholder="Contoh: beli laptop / bayar kuliah">
 
     <label>Jenis Transaksi</label>
-    <select id="jenis" onchange="cekJenis()">
+    <select id="jenis">
       <option value="kredit">Pengeluaran (Kredit)</option>
-      <option value="debit">Pemasukan (Debit/Saldo Awal)</option>
+      <option value="debit">Pemasukan / Tambah Saldo (Debit)</option>
     </select>
 
     <label>Jumlah (Rp)</label>
-    <input type="number" id="jml" placeholder="Contoh: 3500000">
+    <input type="text" id="jml" placeholder="Contoh: 200.000" oninput="formatInputRibuan(this)">
 
     <label>Keterangan (Opsional)</label>
-    <input type="text" id="ket" placeholder="Contoh: Buat belajar / kuliah">
+    <input type="text" id="ket" placeholder="Contoh: buat belajar / pegangan">
 
     <button class="btn btn-simpan" onclick="simpan()">💾 SIMPAN TRANSAKSI</button>
-    <button class="btn btn-reset" onclick="resetSemua()">↺ RESET SEMUA DATA</button>
+    <button class="btn btn-reset" onclick="resetSemua()">↺ RESET DATA KE Rp 6.600.000</button>
   </div>
 
   <div class="riwayat">
@@ -106,13 +106,27 @@
 </div>
 
 <script>
-// Set default tanggal hari ini
+const SALDO_AWAL = 6600000;
 document.getElementById('tgl').valueAsDate = new Date();
 
-let data = JSON.parse(localStorage.getItem("keuangan_kip_rey") || "[]");
+let data = JSON.parse(localStorage.getItem("keuangan_kip_rey_v3") || "[]");
 
 function formatRupiah(n) {
   return "Rp " + Number(n).toLocaleString("id-ID");
+}
+
+function formatInputRibuan(e) {
+  let value = e.value.replace(/\D/g, "");
+  if (value === "") {
+    e.value = "";
+    return;
+  }
+  e.value = Number(value).toLocaleString("id-ID");
+}
+
+function parseAngka(str) {
+  if (!str) return 0;
+  return Number(str.toString().replace(/\./g, "").replace(/,/g, ""));
 }
 
 function formatTanggal(tglStr) {
@@ -124,23 +138,29 @@ function formatTanggal(tglStr) {
 
 function render() {
   let listTabel = document.getElementById("list-tabel");
-  if (data.length === 0) {
-    listTabel.innerHTML = '<tr><td colspan="8" class="kosong">Belum ada data transaksi</td></tr>';
-    document.getElementById("saldo-akhir").textContent = formatRupiah(0);
-    return;
-  }
+  let saldoBerjalan = SALDO_AWAL;
 
-  let saldoBerjalan = 0;
-  let html = "";
+  let html = `
+    <tr style="background-color: #f9f9f9; font-weight: bold;">
+      <td class="text-center">1</td>
+      <td>-</td>
+      <td>Saldo Awal KIP</td>
+      <td class="text-right debit">${formatRupiah(SALDO_AWAL)}</td>
+      <td class="text-right kredit">Rp 0</td>
+      <td class="text-right">${formatRupiah(SALDO_AWAL)}</td>
+      <td>Pencairan KIP</td>
+      <td class="text-center">-</td>
+    </tr>
+  `;
 
   data.forEach((d, i) => {
-    let debitVal = d.jenis === 'debit' ? Number(d.jml) : 0;
-    let kreditVal = d.jenis === 'kredit' ? Number(d.jml) : 0;
+    let debitVal = d.jenis === 'debit' ? parseAngka(d.jml) : 0;
+    let kreditVal = d.jenis === 'kredit' ? parseAngka(d.jml) : 0;
     
     saldoBerjalan = saldoBerjalan + debitVal - kreditVal;
 
     html += `<tr>
-      <td class="text-center">${i + 1}</td>
+      <td class="text-center">${i + 2}</td>
       <td>${formatTanggal(d.tgl)}</td>
       <td>${d.uraian}</td>
       <td class="text-right debit">${debitVal > 0 ? formatRupiah(debitVal) : 'Rp 0'}</td>
@@ -159,7 +179,8 @@ function simpan() {
   let tgl = document.getElementById("tgl").value;
   let uraian = document.getElementById("uraian").value.trim();
   let jenis = document.getElementById("jenis").value;
-  let jml = Number(document.getElementById("jml").value);
+  let jmlStr = document.getElementById("jml").value;
+  let jml = parseAngka(jmlStr);
   let ket = document.getElementById("ket").value.trim();
 
   if (!tgl || !uraian || !jml || jml <= 0) {
@@ -167,10 +188,9 @@ function simpan() {
     return;
   }
 
-  data.push({ tgl, uraian, jenis, jml, ket });
-  localStorage.setItem("keuangan_kip_rey", JSON.stringify(data));
+  data.push({ tgl, uraian, jenis, jml: jmlStr, ket });
+  localStorage.setItem("keuangan_kip_rey_v3", JSON.stringify(data));
 
-  // Reset form input
   document.getElementById("uraian").value = "";
   document.getElementById("jml").value = "";
   document.getElementById("ket").value = "";
@@ -185,15 +205,15 @@ function simpan() {
 function hapusItem(index) {
   if (confirm("Yakin ingin menghapus transaksi ini?")) {
     data.splice(index, 1);
-    localStorage.setItem("keuangan_kip_rey", JSON.stringify(data));
+    localStorage.setItem("keuangan_kip_rey_v3", JSON.stringify(data));
     render();
   }
 }
 
 function resetSemua() {
-  if (confirm("Yakin ingin menghapus seluruh data laporan keuangan?")) {
+  if (confirm("Yakin ingin menghapus seluruh data pengeluaran? Saldo akan kembali ke Rp 6.600.000")) {
     data = [];
-    localStorage.removeItem("keuangan_kip_rey");
+    localStorage.removeItem("keuangan_kip_rey_v3");
     render();
   }
 }
